@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Self-Modifying Code — FlagVault CTF</title>
+  <link rel="stylesheet" href="styles.css"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔄</text></svg>"/>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="#" class="nav-brand"><span class="bracket">[</span><span class="brand-flag">FLAG</span>VAULT<span class="bracket">]</span></a>
+  <ul class="nav-links">
+    <li><a href="#">Challenges</a></li>
+    <li><a href="#" class="active">SelfMod</a></li>
+    <li><a href="#">Scoreboard</a></li>
+  </ul>
+  <div class="nav-status"><div class="status-dot"></div>CHALLENGE LIVE</div>
+</nav>
+
+<div class="page-wrap">
+
+  <header class="page-header" data-index="R2">
+    <div class="page-eyebrow">REVERSE ENGINEERING · CHALLENGE #R2</div>
+    <h1 class="page-title"><span class="hl2">Self</span><span class="hl">-Modifying Code</span></h1>
+    <p class="page-desc">
+      The binary modifies its own instructions at runtime.<br/>
+      Static analysis alone will mislead you. Think dynamically.
+    </p>
+  </header>
+
+  <div class="stats-strip">
+    <div class="stat-box"><span class="stat-val">350</span><span class="stat-label">Points</span></div>
+    <div class="stat-box"><span class="stat-val red">Medium</span><span class="stat-label">Difficulty</span></div>
+    <div class="stat-box"><span class="stat-val amber">27</span><span class="stat-label">Solves</span></div>
+    <div class="stat-box"><span class="stat-val">Rev Eng</span><span class="stat-label">Category</span></div>
+  </div>
+
+  <div class="download-bar">
+    <span class="dl-icon">⚙️</span>
+    <span class="dl-name">selfmod</span>
+    <span class="dl-size">15 KB · ELF 64-bit stripped · Linux x86-64</span>
+    <a href="files/selfmod" download class="btn btn-primary dl-btn">↓ Download Binary</a>
+  </div>
+
+  <div class="sm-layout">
+
+    <!-- ══════ LEFT ══════ -->
+    <div class="sm-left">
+
+      <!-- Binary simulation terminal -->
+      <div class="sec-divider"><h3>Binary Simulation</h3></div>
+      <div class="sim-card">
+        <div class="sim-bar">
+          <span class="sim-dot sim-r"></span><span class="sim-dot sim-y"></span><span class="sim-dot sim-g"></span>
+          <span class="sim-title">./selfmod — simulated execution</span>
+        </div>
+        <div class="sim-terminal" id="sim-terminal">
+          <div class="st-line st-dim">$ chmod +x selfmod && ./selfmod</div>
+        </div>
+        <div class="sim-controls">
+          <button class="btn btn-primary" id="btn-run" onclick="simulateRun()">▶ Run Binary</button>
+          <button class="btn" id="btn-gdb" onclick="simulateGDB()" style="border-color:var(--accent3);color:var(--accent3)">🔍 Run under GDB</button>
+          <button class="btn" id="btn-strace" onclick="simulateStrace()" style="border-color:#a78bfa;color:#a78bfa">📡 Run with strace</button>
+          <button class="sm-clear-btn" onclick="clearTerminal()">✕ Clear</button>
+        </div>
+      </div>
+
+      <!-- Static vs Dynamic panel -->
+      <div class="sec-divider"><h3>Static vs Dynamic Analysis</h3></div>
+      <div class="compare-tabs">
+        <div class="ct-tabs">
+          <button class="ct-tab active" onclick="switchCTab('strings-out')">📝 strings</button>
+          <button class="ct-tab" onclick="switchCTab('hexdump-out')">🔢 hexdump</button>
+          <button class="ct-tab" onclick="switchCTab('disasm-out')">🖥 disasm</button>
+          <button class="ct-tab" onclick="switchCTab('dynamic-out')">⚡ dynamic</button>
+        </div>
+
+        <!-- strings -->
+        <div class="ct-panel active" id="panel-strings-out">
+          <div class="ct-label">// strings ./selfmod — misleading output!</div>
+          <div class="ct-body">
+            <div class="cl-line cl-dim">$ strings -n 8 ./selfmod</div>
+            <div class="cl-line cl-decoy">FlagVault{th1s_1s_not_the_flag}</div>
+            <div class="cl-line cl-decoy">FlagVault{try_harder_reversing}</div>
+            <div class="cl-line cl-warn">The flag is hidden. Try dynamic analysis.</div>
+            <div class="cl-line cl-dim">FlagVault{%s}</div>
+            <div class="cl-line cl-dim">[+] Payload decrypted. Flag:</div>
+            <div class="cl-line cl-dim">[*] Decrypting runtime payload...</div>
+            <div class="cl-line cl-dim">=== SelfMod Binary v1.0 ===</div>
+            <div class="cl-line cl-dim">/lib64/ld-linux-x86-64.so.2</div>
+            <div class="cl-line cl-dim">libc.so.6</div>
+            <div class="cl-note">⚠ Two fake flags in strings output — classic misdirection!</div>
+            <div class="cl-note">The REAL flag is stored encrypted and only appears at runtime.</div>
+          </div>
+        </div>
+
+        <!-- hexdump -->
+        <div class="ct-panel" id="panel-hexdump-out">
+          <div class="ct-label">// xxd ./selfmod | grep -A2 "enc_payload" (offset ~0x4020)</div>
+          <div class="ct-body" id="hexdump-body"><!-- built by JS --></div>
+        </div>
+
+        <!-- disasm -->
+        <div class="ct-panel" id="panel-disasm-out">
+          <div class="ct-label">// objdump -d ./selfmod — decrypt_and_run() function</div>
+          <div class="ct-body">
+            <div class="cl-line cl-dim">Disassembly of section .text:</div>
+            <div class="cl-line cl-dim">&nbsp;</div>
+            <div class="cl-line"><span class="cl-addr">0000000000001169</span> &lt;decrypt_and_run&gt;:</div>
+            <div class="cl-line"><span class="cl-addr">  1169:</span> <span class="cl-bytes">55</span>                      push   rbp</div>
+            <div class="cl-line"><span class="cl-addr">  116a:</span> <span class="cl-bytes">48 89 e5</span>               mov    rbp,rsp</div>
+            <div class="cl-line"><span class="cl-addr">  116d:</span> <span class="cl-bytes">48 83 ec 20</span>            sub    rsp,0x20</div>
+            <div class="cl-line"><span class="cl-addr">  1171:</span> <span class="cl-bytes">be 1d 00 00 00</span>         mov    esi,0x1d    <span class="cl-comment">; 29 bytes</span></div>
+            <div class="cl-line"><span class="cl-addr">  1176:</span> <span class="cl-bytes">48 8b 05 93 2e 00 00</span>   mov    rax,[rip+0x2e93]  <span class="cl-comment">; enc_payload</span></div>
+            <div class="cl-line"><span class="cl-addr">  117d:</span> <span class="cl-bytes">48 89 c7</span>               mov    rdi,rax</div>
+            <div class="cl-line"><span class="cl-addr">  1180:</span> <span class="cl-bytes">e8 db fe ff ff</span>         call   <span class="cl-acc">malloc</span></div>
+            <div class="cl-line"><span class="cl-addr">  1185:</span> <span class="cl-bytes">48 89 45 f0</span>            mov    QWORD PTR [rbp-0x10],rax</div>
+            <div class="cl-line"><span class="cl-addr">  ...</span>                                                             </div>
+            <div class="cl-line"><span class="cl-addr">  11a2:</span> <span class="cl-bytes">80 f1 ab</span>               <span class="cl-key">xor    cl,0xab</span>    <span class="cl-comment">; ← XOR KEY HERE!</span></div>
+            <div class="cl-line"><span class="cl-addr">  11a5:</span> <span class="cl-bytes">88 0c 02</span>               mov    BYTE PTR [rdx+rax*1],cl</div>
+            <div class="cl-line"><span class="cl-addr">  ...</span>                                                             </div>
+            <div class="cl-line"><span class="cl-addr">  11c0:</span> <span class="cl-bytes">e8 7b fe ff ff</span>         call   <span class="cl-acc">printf</span>    <span class="cl-comment">; prints FlagVault{...}</span></div>
+            <div class="cl-note">✓ Key 0xAB visible in disassembly at offset 0x11a2!</div>
+            <div class="cl-note">Now XOR the encrypted bytes with 0xAB to get the flag.</div>
+          </div>
+        </div>
+
+        <!-- dynamic -->
+        <div class="ct-panel" id="panel-dynamic-out">
+          <div class="ct-label">// GDB breakpoint on decrypt_and_run return → examine buffer</div>
+          <div class="ct-body">
+            <div class="cl-line cl-dim">(gdb) break decrypt_and_run</div>
+            <div class="cl-line cl-dim">(gdb) run</div>
+            <div class="cl-line cl-dim">Breakpoint 1, 0x00005555555551a8 in decrypt_and_run ()</div>
+            <div class="cl-line cl-dim">(gdb) finish</div>
+            <div class="cl-line cl-dim">Run till exit from #0 decrypt_and_run ()</div>
+            <div class="cl-line">=== SelfMod Binary v1.0 ===</div>
+            <div class="cl-line">Analyzing binary integrity...</div>
+            <div class="cl-line">The flag is hidden. Try dynamic analysis.</div>
+            <div class="cl-line">[*] Decrypting runtime payload...</div>
+            <div class="cl-line">[*] XOR key applied at offset 0x2bb2</div>
+            <div class="cl-line">[+] Payload decrypted. Flag:</div>
+            <div class="cl-line cl-flag">FlagVault{s3lf_m0d1fy1ng_c0d3_1s_tr1cky}</div>
+            <div class="cl-note">✓ Dynamic analysis reveals the decrypted flag directly!</div>
+          </div>
+        </div>
+
+      </div><!-- /compare-tabs -->
+
+      <!-- Interactive Solver -->
+      <div class="sec-divider"><h3>Interactive Solver — Decrypt the Payload</h3></div>
+      <div class="solver-card">
+
+        <!-- Step 1: Identify encrypted bytes -->
+        <div class="slv-step" id="s1">
+          <div class="slv-hdr" onclick="toggleSlv(1)">
+            <div class="slv-n">01</div>
+            <div class="slv-ti"><strong>Extract Encrypted Payload</strong><span>Locate enc_payload in binary's .rodata section</span></div>
+            <span class="slv-tog" id="s1t">▶ Open</span>
+          </div>
+          <div class="slv-body hidden" id="s1b">
+            <p class="slv-p">The binary stores an encrypted byte array in <code>.rodata</code>. Use <code>xxd</code>, Ghidra, or IDA to find it. The bytes look like random noise in static analysis.</p>
+            <div class="enc-bytes-vis" id="enc-bytes-vis"><!-- built by JS --></div>
+            <button class="btn btn-primary slv-btn" onclick="showEncBytes()">📦 Show Extracted Bytes</button>
+            <div class="slv-res hidden" id="s1-res"></div>
+          </div>
+        </div>
+
+        <!-- Step 2: Find the key -->
+        <div class="slv-step locked" id="s2">
+          <div class="slv-hdr" onclick="toggleSlv(2)">
+            <div class="slv-n">02</div>
+            <div class="slv-ti"><strong>Identify the XOR Key</strong><span>Spot <code>xor cl, 0xAB</code> in disassembly</span></div>
+            <span class="slv-tog" id="s2t">🔒</span>
+          </div>
+          <div class="slv-body hidden" id="s2b">
+            <p class="slv-p">The decompiler reveals a loop that XORs each byte with a constant. Find that constant — it's the decryption key.</p>
+            <div class="key-finder" id="key-finder"><!-- built by JS --></div>
+            <button class="btn btn-primary slv-btn" id="s2-btn" onclick="showKey()" disabled>🔑 Identify Key</button>
+            <div class="slv-res hidden" id="s2-res"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Decrypt -->
+        <div class="slv-step locked" id="s3">
+          <div class="slv-hdr" onclick="toggleSlv(3)">
+            <div class="slv-n">03</div>
+            <div class="slv-ti"><strong>Apply XOR Decryption</strong><span>enc[i] XOR 0xAB → plaintext flag</span></div>
+            <span class="slv-tog" id="s3t">🔒</span>
+          </div>
+          <div class="slv-body hidden" id="s3b">
+            <p class="slv-p">Apply the key byte-by-byte to the encrypted array. Each XOR operation reveals a plaintext character.</p>
+            <div class="decrypt-vis" id="decrypt-vis"><!-- built by JS --></div>
+            <button class="btn btn-primary slv-btn" id="s3-btn" onclick="runDecrypt()" disabled>⚡ Decrypt Payload</button>
+            <div class="slv-res hidden" id="s3-res"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Flag reveal -->
+      <div id="flag-reveal" class="flag-reveal hidden">
+        <div class="fr-glow"></div>
+        <div class="fr-icon">🔄</div>
+        <h2 class="fr-title">Binary Reversed!</h2>
+        <p class="fr-sub">Self-modifying code uses runtime decryption to hide from static tools. Dynamic analysis always wins.</p>
+        <div class="fr-box">
+          <span class="fr-lbl">🚩 RECOVERED FLAG</span>
+          <code class="fr-val" id="fr-val"></code>
+          <button class="btn-copy-sm" onclick="copyFlag()">📋 Copy</button>
+          <div class="copy-toast hidden" id="copy-toast">✓ Copied!</div>
+        </div>
+        <div class="fr-proof">
+          <div class="fp-row"><span class="fp-k">Enc payload</span><span class="fp-v fp-enc">29 bytes in .rodata (XOR'd garbage)</span></div>
+          <div class="fp-row"><span class="fp-k">XOR Key</span><span class="fp-v fp-key">0xAB  (found at: xor cl,0xab in disasm)</span></div>
+          <div class="fp-row"><span class="fp-k">Decoys</span><span class="fp-v fp-decoy">2 fake flags planted in strings output</span></div>
+          <div class="fp-row"><span class="fp-k">Flag</span><span class="fp-v fp-flag">FlagVault{s3lf_m0d1fy1ng_c0d3_1s_tr1cky}</span></div>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ══════ RIGHT ══════ -->
+    <div class="sm-right">
+
+      <div class="sec-divider"><h3>Challenge Info</h3></div>
+      <div class="info-panel">
+        <div class="info-row"><span class="info-key">Binary</span><span class="tag tag-red">ELF 64-bit stripped</span></div>
+        <div class="info-row"><span class="info-key">Technique</span><span class="tag tag-amber">Runtime Decryption</span></div>
+        <div class="info-row"><span class="info-key">Anti-analysis</span><code>Decoy strings, anti-debug</code></div>
+        <div class="info-row"><span class="info-key">Category</span><span class="tag tag-green">Reverse Engineering</span></div>
+        <div class="info-row"><span class="info-key">Points</span><span style="color:var(--accent);font-family:var(--font-hud)">350</span></div>
+      </div>
+
+      <div class="sec-divider"><h3>Background</h3></div>
+      <div class="desc-block">
+        <p>Self-modifying code (SMC) decrypts or modifies parts of itself at runtime. Malware authors use it to evade static AV scanners. In this CTF, the binary stores the flag encrypted — static tools show only noise and decoys.</p>
+        <br/>
+        <p><strong>Goal:</strong> Find the encrypted buffer and the XOR key used to decrypt it. The key is visible in the disassembly of the decryption loop.</p>
+      </div>
+
+      <!-- Traps to avoid -->
+      <div class="sec-divider"><h3>⚠ Traps &amp; Misdirections</h3></div>
+      <div class="traps-list">
+        <div class="trap-item trap-bad">
+          <div class="trap-icon">🪤</div>
+          <div class="trap-txt"><strong>Fake flag #1</strong><br/><code>FlagVault{th1s_1s_not_the_flag}</code><br/>Planted in strings to fool beginners</div>
+        </div>
+        <div class="trap-item trap-bad">
+          <div class="trap-icon">🪤</div>
+          <div class="trap-txt"><strong>Fake flag #2</strong><br/><code>FlagVault{try_harder_reversing}</code><br/>Second decoy in .rodata section</div>
+        </div>
+        <div class="trap-item trap-warn">
+          <div class="trap-icon">⚠</div>
+          <div class="trap-txt"><strong>Anti-debug check</strong><br/>Reads <code>/proc/self/status → TracerPid</code><br/>In CTF mode: allowed anyway</div>
+        </div>
+        <div class="trap-item trap-ok">
+          <div class="trap-icon">✓</div>
+          <div class="trap-txt"><strong>Real approach</strong><br/>Find <code>xor cl, 0xAB</code> in disasm OR just run the binary — it prints the flag!</div>
+        </div>
+      </div>
+
+      <!-- Attack paths -->
+      <div class="sec-divider"><h3>Attack Paths</h3></div>
+      <div class="paths-list">
+        <div class="path-item path-easy">
+          <div class="path-badge">EASY</div>
+          <div class="path-txt"><strong>Just run it</strong><br/><code>./selfmod</code> prints the flag directly. No reversing needed!</div>
+        </div>
+        <div class="path-item path-mid">
+          <div class="path-badge">MEDIUM</div>
+          <div class="path-txt"><strong>Disassemble</strong><br/>Find <code>xor cl,0xab</code> → XOR the .rodata bytes → flag</div>
+        </div>
+        <div class="path-item path-hard">
+          <div class="path-badge">HARD</div>
+          <div class="path-txt"><strong>Dynamic analysis</strong><br/>GDB: break on <code>decrypt_and_run</code>, examine memory after loop</div>
+        </div>
+      </div>
+
+      <!-- Key concepts -->
+      <div class="sec-divider"><h3>Key Concepts</h3></div>
+      <div class="concepts-list">
+        <div class="concept-item"><span class="ci-icon">🔄</span><div class="ci-txt"><strong>Runtime decryption</strong> — encrypted data decoded only in memory, never on disk</div></div>
+        <div class="concept-item"><span class="ci-icon">🪤</span><div class="ci-txt"><strong>Decoy strings</strong> — fake flags in .rodata to mislead <code>strings</code> output</div></div>
+        <div class="concept-item"><span class="ci-icon">🔍</span><div class="ci-txt"><strong>TracerPid check</strong> — reads <code>/proc/self/status</code> to detect debuggers</div></div>
+        <div class="concept-item"><span class="ci-icon">🧹</span><div class="ci-txt"><strong>Memory scrubbing</strong> — <code>memset(buf,0)</code> after flag print (anti-forensics)</div></div>
+      </div>
+
+      <!-- Python solve -->
+      <div class="sec-divider"><h3>Python Solve Script</h3></div>
+      <div class="code-block">
+        <div class="cb-lbl">// solve.py</div>
+        <pre class="cb-pre"># Extracted from binary's .rodata section
+# (use: xxd selfmod | grep after "enc_payload" symbol)
+enc = bytes([
+    0xd8, 0x98, 0xc7, 0xcd, 0xf4, 0xc6, 0x9b, 0xcf,
+    0x9a, 0xcd, 0xd2, 0x9a, 0xc5, 0xcc, 0xf4, 0xc8,
+    0x9b, 0xcf, 0x98, 0xf4, 0x9a, 0xd8, 0xf4, 0xdf,
+    0xd9, 0x9a, 0xc8, 0xc0, 0xd2
+])
+
+# Key found in disasm: xor cl, 0xAB
+KEY = 0xAB
+
+flag = bytes([b ^ KEY for b in enc]).decode()
+print(f"FlagVault{{{flag}}}")
+
+# Or: just run the binary!
+# import subprocess
+# out = subprocess.check_output(['./selfmod'])
+# print(out.decode())</pre>
+      </div>
+
+      <!-- GDB commands -->
+      <div class="sec-divider"><h3>GDB / Analysis Commands</h3></div>
+      <div class="gdb-card">
+        <div class="gc-label">// Essential commands</div>
+        <div class="gc-row"><span class="gc-cmd">strings ./selfmod</span><span class="gc-note">shows decoys ⚠</span></div>
+        <div class="gc-row"><span class="gc-cmd">./selfmod</span><span class="gc-note">easiest solve</span></div>
+        <div class="gc-row"><span class="gc-cmd">objdump -d ./selfmod | grep xor</span><span class="gc-note">finds key 0xAB</span></div>
+        <div class="gc-row"><span class="gc-cmd">ltrace ./selfmod</span><span class="gc-note">shows library calls + output</span></div>
+        <div class="gc-row"><span class="gc-cmd">gdb ./selfmod</span><span class="gc-note">full dynamic analysis</span></div>
+        <div class="gc-row"><span class="gc-cmd">strace ./selfmod</span><span class="gc-note">trace syscalls</span></div>
+      </div>
+
+      <!-- Hints -->
+      <div class="sec-divider"><h3>Hints</h3></div>
+      <div class="hints-list">
+        <div class="hint-card">
+          <div class="hint-header" onclick="toggleHint(1)"><span>💡 HINT 1</span><span class="hint-cost tag tag-green">−20 pts</span><span class="hint-toggle" id="h1t">▼ Reveal</span></div>
+          <div class="hint-body hidden" id="h1b">The two flags you see in <code>strings</code> output are decoys. The real flag is stored encrypted in the binary and only decrypted at runtime. Try <strong>just running the binary</strong> — it prints the real flag directly!</div>
+        </div>
+        <div class="hint-card">
+          <div class="hint-header" onclick="toggleHint(2)"><span>💡 HINT 2</span><span class="hint-cost tag tag-red">−40 pts</span><span class="hint-toggle" id="h2t">▼ Reveal</span></div>
+          <div class="hint-body hidden" id="h2b">Run <code>objdump -d ./selfmod | grep xor</code>. You'll see <code>xor cl,0xab</code> inside the decryption loop. That 0xAB is the single-byte key. XOR it against the encrypted bytes in <code>.rodata</code> to get the flag.</div>
+        </div>
+        <div class="hint-card">
+          <div class="hint-header" onclick="toggleHint(3)"><span>💡 HINT 3</span><span class="hint-cost tag tag-purple">−60 pts</span><span class="hint-toggle" id="h3t">▼ Reveal</span></div>
+          <div class="hint-body hidden" id="h3b">Encrypted bytes: d8 98 c7 cd f4 c6 9b cf 9a cd d2 9a c5 cc f4 c8 9b cf 98 f4 9a d8 f4 df d9 9a c8 c0 d2<br/>Key: 0xAB. XOR each byte to recover the flag content, then wrap in <code>FlagVault{…}</code>.</div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="sec-divider"><h3>Submit Flag</h3></div>
+      <div class="flag-submit-panel">
+        <div class="form-group flag-input-wrap">
+          <span class="flag-prefix">FlagVault{</span>
+          <input class="form-control" id="flag-input" type="text" placeholder="your_flag_here" autocomplete="off"/>
+        </div>
+        <button class="btn btn-primary" onclick="submitFlag()" style="width:100%">&gt;_ SUBMIT FLAG</button>
+        <div class="submit-result" id="flag-result"></div>
+      </div>
+
+    </div><!-- /right -->
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-brand">FLAG<span>VAULT</span> CTF</div>
+  <div class="footer-copy">Challenge #R2 · Reverse Engineering · Self-Modifying Code</div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
