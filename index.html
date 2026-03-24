@@ -11,11 +11,6 @@
 
 <nav class="nav">
   <a href="#" class="nav-brand"><span class="bracket">[</span><span class="brand-flag">FLAG</span>VAULT<span class="bracket">]</span></a>
-  <ul class="nav-links">
-    <li><a href="#">Challenges</a></li>
-    <li><a href="#" class="active">SelfMod</a></li>
-    <li><a href="#">Scoreboard</a></li>
-  </ul>
   <div class="nav-status"><div class="status-dot"></div>CHALLENGE LIVE</div>
 </nav>
 
@@ -29,14 +24,6 @@
       Static analysis alone will mislead you. Think dynamically.
     </p>
   </header>
-
-  <div class="stats-strip">
-    <div class="stat-box"><span class="stat-val">350</span><span class="stat-label">Points</span></div>
-    <div class="stat-box"><span class="stat-val red">Medium</span><span class="stat-label">Difficulty</span></div>
-    <div class="stat-box"><span class="stat-val amber">27</span><span class="stat-label">Solves</span></div>
-    <div class="stat-box"><span class="stat-val">Rev Eng</span><span class="stat-label">Category</span></div>
-  </div>
-
   <div class="download-bar">
     <span class="dl-icon">⚙️</span>
     <span class="dl-name">selfmod</span>
@@ -231,7 +218,6 @@
         <div class="info-row"><span class="info-key">Technique</span><span class="tag tag-amber">Runtime Decryption</span></div>
         <div class="info-row"><span class="info-key">Anti-analysis</span><code>Decoy strings, anti-debug</code></div>
         <div class="info-row"><span class="info-key">Category</span><span class="tag tag-green">Reverse Engineering</span></div>
-        <div class="info-row"><span class="info-key">Points</span><span style="color:var(--accent);font-family:var(--font-hud)">350</span></div>
       </div>
 
       <div class="sec-divider"><h3>Background</h3></div>
@@ -323,34 +309,6 @@ print(f"FlagVault{{{flag}}}")
         <div class="gc-row"><span class="gc-cmd">ltrace ./selfmod</span><span class="gc-note">shows library calls + output</span></div>
         <div class="gc-row"><span class="gc-cmd">gdb ./selfmod</span><span class="gc-note">full dynamic analysis</span></div>
         <div class="gc-row"><span class="gc-cmd">strace ./selfmod</span><span class="gc-note">trace syscalls</span></div>
-      </div>
-
-      <!-- Hints -->
-      <div class="sec-divider"><h3>Hints</h3></div>
-      <div class="hints-list">
-        <div class="hint-card">
-          <div class="hint-header" onclick="toggleHint(1)"><span>💡 HINT 1</span><span class="hint-cost tag tag-green">−20 pts</span><span class="hint-toggle" id="h1t">▼ Reveal</span></div>
-          <div class="hint-body hidden" id="h1b">The two flags you see in <code>strings</code> output are decoys. The real flag is stored encrypted in the binary and only decrypted at runtime. Try <strong>just running the binary</strong> — it prints the real flag directly!</div>
-        </div>
-        <div class="hint-card">
-          <div class="hint-header" onclick="toggleHint(2)"><span>💡 HINT 2</span><span class="hint-cost tag tag-red">−40 pts</span><span class="hint-toggle" id="h2t">▼ Reveal</span></div>
-          <div class="hint-body hidden" id="h2b">Run <code>objdump -d ./selfmod | grep xor</code>. You'll see <code>xor cl,0xab</code> inside the decryption loop. That 0xAB is the single-byte key. XOR it against the encrypted bytes in <code>.rodata</code> to get the flag.</div>
-        </div>
-        <div class="hint-card">
-          <div class="hint-header" onclick="toggleHint(3)"><span>💡 HINT 3</span><span class="hint-cost tag tag-purple">−60 pts</span><span class="hint-toggle" id="h3t">▼ Reveal</span></div>
-          <div class="hint-body hidden" id="h3b">Encrypted bytes: d8 98 c7 cd f4 c6 9b cf 9a cd d2 9a c5 cc f4 c8 9b cf 98 f4 9a d8 f4 df d9 9a c8 c0 d2<br/>Key: 0xAB. XOR each byte to recover the flag content, then wrap in <code>FlagVault{…}</code>.</div>
-        </div>
-      </div>
-
-      <!-- Submit -->
-      <div class="sec-divider"><h3>Submit Flag</h3></div>
-      <div class="flag-submit-panel">
-        <div class="form-group flag-input-wrap">
-          <span class="flag-prefix">FlagVault{</span>
-          <input class="form-control" id="flag-input" type="text" placeholder="your_flag_here" autocomplete="off"/>
-        </div>
-        <button class="btn btn-primary" onclick="submitFlag()" style="width:100%">&gt;_ SUBMIT FLAG</button>
-        <div class="submit-result" id="flag-result"></div>
       </div>
 
     </div><!-- /right -->
